@@ -39,51 +39,90 @@ defmodule Day3 do
     Enum.zip(zero_values, one_values) |> Enum.reduce({[], []}, &Day3.combine/2)
   end
 
-  def build_tree(input, tree \\ %{})
-
-  def build_tree([input], tree) do
-    {old_val, final_tree} = append_tree(
-      String.graphemes(input) |> Enum.map(&String.to_integer/1),
-      input,
-      tree
-    )
-
-    final_tree
-  end
-
-  def build_tree([input | inputs], tree) do
-    {old_val, new_tree} = append_tree(
-      String.graphemes(input) |> Enum.map(&String.to_integer/1),
-      input,
-      tree
-    )
-
-    build_tree(inputs, new_tree)
-  end
-
-  def append_tree([final], input, tree) do
-    Map.get_and_update(tree, final, fn current_value ->
-      {current_value, [input | (current_value || [])]}
-    end)
-  end
-
-  def append_tree([val | values], input, tree) do
-    Map.get_and_update(tree, val, fn current_value ->
-      {current_value, elem(append_tree(values, input, current_value || %{}), 1)}
-    end)
-  end
-
-  def value_for(val_tree, [final_bit]) do
-    Map.get(val_tree, final_bit)
-  end
-
-  def value_for(val_tree, [bit | bits]) do
-    value_for(Map.get(val_tree, bit), bits)
-  end
 
   def power_consumption(input) do
     {gamma, epsilon} = Day3.bit_usage(input)   |> Day3.checksums
 
     Integer.undigits(gamma, 2) * Integer.undigits(epsilon, 2)
+  end
+
+  # Walk through the indices of string inputs. At each index identify *only* the
+  # ones that fit `criteria`, and use only those for the *next* index. If at any
+  # point we only have one value remaining, that's our result.
+  def ratings(input, criteria, i \\ 0)
+
+  def ratings([input], _, _) do
+    input
+  end
+
+  def ratings(inputs, criteria, i) do
+    counts = Enum.frequencies_by(inputs, &(String.at(&1, i)))
+
+    remaining = Enum.filter(inputs, &(criteria.(&1, counts, i)))
+
+    IO.puts("#{length(remaining)}, #{i}")
+
+    if i > 100 do
+      IO.puts("#{inspect(remaining)}")
+      remaining
+    else
+      Day3.ratings(
+        remaining,
+        criteria,
+        i + 1
+      )
+    end
+  end
+
+  # Oxygen ratings are ones where the `i`-th value is:
+  # * the most popular value amongst remaining ratings
+  # * "1" if the numbers are equal
+  # * everything if only one of "0" or "1" is represented at `i`
+  def oxygen_criteria(input, counts, i) do
+    val = String.at(input, i)
+
+    count = Map.get(counts, val)
+
+    zero_count = Map.get(counts, "0")
+    one_count = Map.get(counts, "1")
+
+    cond do
+      count == nil -> true
+      zero_count == one_count -> val == "1"
+      true -> Enum.max(Map.values(counts)) == count
+    end
+  end
+
+  # CO2 ratings are ones where the `i`-th value is:
+  # * the least popular value amongst remaining ratings
+  # * "0" if the numbers are equal
+  # * everything if only one of "0" or "1" is represented at `i`
+  def co2_criteria(input, counts, i) do
+    val = String.at(input, i)
+
+    count = Map.get(counts, val)
+
+    zero_count = Map.get(counts, "0")
+    one_count = Map.get(counts, "1")
+
+    cond do
+      count == nil -> true
+      zero_count == one_count -> val == "0"
+      true -> Enum.min(Map.values(counts)) == count
+    end
+  end
+
+  def scrubber_rating(input) do
+    oxygen_value = Day3.ratings(input, &Day3.oxygen_criteria/3)
+    co2_value = Day3.ratings(input, &Day3.co2_criteria/3)
+
+    oxygen_rating = Integer.undigits(as_digits(oxygen_value), 2)
+    co2_rating = Integer.undigits(as_digits(co2_value), 2)
+
+    oxygen_rating * co2_rating
+  end
+
+  def as_digits(input_text) do
+    String.graphemes(input_text) |> Enum.map(&String.to_integer/1)
   end
 end
