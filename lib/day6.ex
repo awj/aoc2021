@@ -5,8 +5,8 @@ defmodule Day6 do
     @default_age 6
     @default_new_age 8
 
-    @max_fish 100
-    @min_fish 10
+    @max_fish 10_000
+    @min_fish 1_000
 
     def new(fish) do
       GenServer.start_link(FishPond, fish)
@@ -39,12 +39,12 @@ defmodule Day6 do
 
       count = Enum.count(new_fish)
       if count > @max_fish do
-        new_pools = Enum.drop(new_fish, @max_fish) |> Enum.chunk_every(@min_fish) |> Enum.map(fn (pop) ->
+        new_pools = Enum.drop(new_fish, @min_fish) |> Enum.chunk_every(@min_fish) |> Enum.map(fn (pop) ->
           {:ok, pid} = FishPond.new(pop)
           pid
         end)
 
-        {:reply, new_pools, Enum.take(new_fish, @max_fish) }
+        {:reply, new_pools, Enum.take(new_fish, @min_fish) }
       else
         {:reply, [], new_fish }
       end
@@ -79,5 +79,41 @@ defmodule Day6 do
     Enum.map(final_ponds, &(GenServer.stop(&1)))
 
     count
+  end
+
+  # Keep track of the *number* of lanternfish in a given day of spawning by a
+  # Map of day => fish_count. Simulate a day by:
+  # * decrementing all of the day counts
+  # * Removing any -1 value
+  # * Adding that count to `6` (for spawn resetting)
+  # * ALSO adding that count to `8` (for newly spawned fish)
+  def express_simulate(starting_state, days) do
+    ages = String.split(starting_state, ",") |> Enum.map(&String.to_integer/1) |> Enum.frequencies
+
+    run_simulation(ages, days)
+  end
+
+  def run_simulation(ages, 0) do
+    Map.values(ages) |> Enum.sum
+  end
+
+  @default_age 6
+  @default_new_age 8
+
+  def run_simulation(ages, days) do
+    updated_ages = for {age, count} <- ages, into: %{}, do: {age - 1, count}
+
+    spawning = Map.get(updated_ages, -1, 0)
+
+    updated_ages = Map.delete(updated_ages, -1)
+
+    increment = fn (current) -> {current, (current || 0) + spawning } end
+
+    {_, updated_ages} = Map.get_and_update(updated_ages, @default_age, increment)
+    {_, updated_ages} = Map.get_and_update(updated_ages, @default_new_age, increment)
+
+    current_population = Map.values(updated_ages) |> Enum.sum
+    IO.puts("#{days}: #{current_population} (+#{spawning})")
+    run_simulation(updated_ages, days - 1)
   end
 end
