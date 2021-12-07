@@ -1,12 +1,15 @@
 defmodule Day6 do
-  defmodule Lanternfish do
+  defmodule FishPond do
     use GenServer
 
     @default_age 6
     @default_new_age 8
 
-    def spawn_fish(age \\ @default_new_age) do
-      GenServer.start_link(Lanternfish, age)
+    @max_fish 100
+    @min_fish 10
+
+    def new(fish) do
+      GenServer.start_link(FishPond, fish)
     end
 
     def tick(pid) do
@@ -18,54 +21,62 @@ defmodule Day6 do
     end
 
     @impl true
-    def init(age) do
-      {:ok, {age, []}}
+    def init(fish) do
+      {:ok, fish}
     end
 
     @impl true
-    def handle_call(:tick, _from, { age, children }) do
-      Enum.map(children, &(Lanternfish.tick(&1)))
+    def handle_call(:tick, _from, fish) do
+      new_fish = Enum.flat_map(fish, fn (age) ->
+        new_age = age - 1
 
-      age = age - 1
+        if new_age < 0 do
+          [@default_age, @default_new_age]
+        else
+          [new_age]
+        end
+      end)
 
-      if age == -1 do
-        age = @default_age
-        new_children = [new_fish | children]
-        {:reply, {age, Enum.count(new_children) }, { age, new_children }}
+      count = Enum.count(new_fish)
+      if count > @max_fish do
+        new_pools = Enum.drop(new_fish, @max_fish) |> Enum.chunk_every(@min_fish) |> Enum.map(fn (pop) ->
+          {:ok, pid} = FishPond.new(pop)
+          pid
+        end)
+
+        {:reply, new_pools, Enum.take(new_fish, @max_fish) }
       else
-        {:reply, {age, Enum.count(children) }, { age, children } }
+        {:reply, [], new_fish }
       end
     end
 
     @impl true
-    def handle_call(:population, _from, { age, children }) do
-      count = Enum.reduce(children, 1, fn (pid, acc) -> acc + Lanternfish.population(pid) end)
-      {:reply, count, { age, children } }
-    end
-
-    def terminate(reason, state) do
-      { _age, children } = state
-      Enum.map(children, &(GenServer.stop( &1)) )
+    def handle_call(:population, _from, fish) do
+      count = Enum.count(fish)
+      {:reply, count, fish }
     end
   end
 
   def simulate(starting_state, days) do
-    population  = String.split(starting_state, ",")
+    ponds  = String.split(starting_state, ",")
     |> Stream.map(&String.to_integer/1)
-    |> Enum.map(fn (init_age) ->
-      {:ok, pid} = Lanternfish.spawn_fish(init_age)
+    |> Enum.chunk_every(10)
+    |> Enum.map(fn (init_fish) ->
+      {:ok, pid} = Day6.FishPond.new(init_fish)
       pid
     end)
 
-    Enum.each(1..days, fn (day) ->
-      Enum.map(population, &Lanternfish.tick/1)
-      count = Stream.map(population, &Lanternfish.population/1) |> Enum.sum
-      IO.puts "#{day}: #{count}"
+    final_ponds = Enum.reduce(1..days, ponds, fn (day, ponds) ->
+      results = Enum.flat_map(ponds, &FishPond.tick/1)
+      new_ponds = Enum.concat(results, ponds)
+      count = Stream.map(new_ponds, &FishPond.population/1) |> Enum.sum
+      IO.puts "#{day}: #{count} (#{Enum.count(ponds)} ponds)"
+      new_ponds
     end)
 
-    count = Stream.map(population, &Lanternfish.population/1) |> Enum.sum
+    count = Stream.map(final_ponds, &FishPond.population/1) |> Enum.sum
 
-    Enum.map(population, &(GenServer.stop(&1)))
+    Enum.map(final_ponds, &(GenServer.stop(&1)))
 
     count
   end
