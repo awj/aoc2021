@@ -12,6 +12,10 @@ defmodule Day12 do
       }
     end
 
+    def debug(fragment) do
+      Enum.join(fragment.path, ",")
+    end
+
     def can_add?(fragment, {start, dest} = step) when fragment.double_pass_happened == false and fragment.double_pass == start do
       head = hd(fragment.path)
       dest == head
@@ -21,17 +25,15 @@ defmodule Day12 do
       head = hd(fragment.path)
       cond do
         MapSet.member?(fragment.small_caves, start) -> false
-        MapSet.member?(fragment.steps, step) -> false
         true -> dest == head
       end
     end
 
-    def add(fragment, prior_step) when fragment.double_pass == prior_step do
+    def add(fragment, prior_step) when fragment.double_pass == prior_step and fragment.double_pass_happened == false do
       %PathFragment{
         fragment |
         path: [prior_step | fragment.path],
-        small_caves: mark_small_cave(fragment.small_caves, prior_step),
-        double_pass_happened: MapSet.member?(fragment.small_caves, prior_step)
+        double_pass_happened: true
       }
     end
 
@@ -111,7 +113,7 @@ defmodule Day12 do
   def fully_expand(working_paths, steps, complete_paths \\ [])
 
   def fully_expand([], _steps, complete_path) do
-    complete_path
+    Enum.uniq_by(complete_path, fn (fragment) -> fragment.path end)
   end
 
   def fully_expand(working_paths, steps, complete_paths) do
@@ -130,8 +132,15 @@ defmodule Day12 do
     steps = parse(input)
     seeds = seed_paths(steps)
 
+    expanded = fully_expand(seeds, steps)
+
+    expanded
+    |> Enum.map(fn (fragment) -> PathFragment.debug(fragment) end)
+    |> Enum.sort
+    |> Enum.map(&(IO.inspect(&1)))
+
     Enum.count(
-      fully_expand(seeds, steps)
+      expanded
     )
   end
 end
