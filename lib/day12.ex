@@ -1,14 +1,20 @@
 defmodule Day12 do
   defmodule PathFragment do
-    defstruct path: [], small_caves: MapSet.new([]), steps: MapSet.new([])
+    defstruct path: [], small_caves: MapSet.new([]), steps: MapSet.new([]), double_pass: "", double_pass_happened: false
 
-    def new({origin, destination}) do
+    def new({origin, destination}, double_pass \\ "") do
       small_caves = Enum.filter([origin, destination], fn (location) -> Day12.small_cave?(location) end)
       %PathFragment{
         path: [origin, destination],
         small_caves: MapSet.new(small_caves),
-        steps: MapSet.new([{origin, destination}])
+        steps: MapSet.new([{origin, destination}]),
+        double_pass: double_pass
       }
+    end
+
+    def can_add?(fragment, {start, dest} = step) when fragment.double_pass_happened == false and fragment.double_pass == start do
+      head = hd(fragment.path)
+      dest == head
     end
 
     def can_add?(fragment, {start, dest} = step) do
@@ -20,11 +26,21 @@ defmodule Day12 do
       end
     end
 
-    def add(fragment, prior_step) do
+    def add(fragment, prior_step) when fragment.double_pass == prior_step do
       %PathFragment{
+        fragment |
         path: [prior_step | fragment.path],
         small_caves: mark_small_cave(fragment.small_caves, prior_step),
-        steps: MapSet.put(fragment.steps, {prior_step, hd(fragment.path)})
+        double_pass_happened: MapSet.member?(fragment.small_caves, prior_step)
+      }
+    end
+
+    def add(fragment, prior_step) do
+      %PathFragment{
+        fragment |
+        path: [prior_step | fragment.path],
+        small_caves: mark_small_cave(fragment.small_caves, prior_step),
+        steps: MapSet.put(fragment.steps, {prior_step, hd(fragment.path)}),
       }
     end
 
@@ -54,10 +70,22 @@ defmodule Day12 do
   end
 
   def seed_paths(steps) do
-    steps
-    |> Enum.flat_map(&bidirectional/1)
-    |> Enum.filter(fn ({_origin, destination}) -> destination == "end" end)
-    |> Enum.map(&PathFragment.new/1)
+    location_names = Enum.map(steps, &Tuple.to_list/1) |> List.flatten |> Enum.uniq
+
+    passable_small_caves = Enum.filter(location_names, fn
+      "start" -> false
+      "end" -> false
+      cave -> small_cave?(cave)
+    end)
+
+    seeds = for step <- steps,
+        {_origin, destination} = dir <- bidirectional(step),
+      double_passee <- passable_small_caves,
+      destination == "end" do
+        PathFragment.new(dir, double_passee)
+    end
+
+    Enum.uniq_by(seeds, fn (seed) -> {seed.double_pass, hd(seed.path)} end)
   end
 
   def can_expand?(path, steps) do
@@ -96,5 +124,14 @@ defmodule Day12 do
     IO.inspect(%{grown: Enum.count(grown), working: Enum.count(working_paths), complete: Enum.count(complete_paths), finished: Enum.count(finished), growable: Enum.count(growable)})
 
     fully_expand(growable, steps, Enum.concat(complete_paths, new_completions))
+  end
+
+  def count_paths(input) do
+    steps = parse(input)
+    seeds = seed_paths(steps)
+
+    Enum.count(
+      fully_expand(seeds, steps)
+    )
   end
 end
