@@ -84,13 +84,31 @@ defmodule Day15 do
   end
 
   def parse(input) do
-    map = for {line, col} <- String.split(input) |> Enum.with_index,
-              {val, row} <- String.split(line, "", trim: true) |> Enum.with_index,
+    map = for {line, row} <- String.split(input) |> Enum.with_index,
+              {val, col} <- String.split(line, "", trim: true) |> Enum.with_index,
       into: %{} do
          {{row, col}, String.to_integer(val)}
     end
 
     map
+  end
+
+  def expand(map, n) do
+    {size, _} = Enum.max(Map.keys(map))
+
+    size = size + 1
+
+    for {{x, y}, val} <- map,
+      dx <- 0..(n-1),
+      dy <- 0..(n-1),
+      into: %{} do
+        point = {x + (size * dx), y + (size * dy)}
+        nval = val + dx + dy
+        cond do
+          nval > 9 -> {point, nval - 9}
+          true -> {point, nval}
+        end
+    end
   end
 
   def target(map) do
@@ -127,7 +145,6 @@ defmodule Day15 do
   def find_cheapest_route(map, {scored, history}, destination) do
     {candidate, scored} = ScoredResults.remove(scored)
 
-    IO.inspect(candidate)
     options = Trail.options(candidate, map, history)
 
     case Enum.find(options, fn option -> Trail.at_destination?(option, destination) end) do
