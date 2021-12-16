@@ -61,6 +61,8 @@ defmodule Day14 do
   # Walk the list of polymer pairs. Generate frequencies and *update* shortcuts
   # for each pair. Merge the frequencies with whatever we generate for the next
   # pair in line, reusing the shortcuts we just computed along the way.
+  #
+  # @return map of frequency values for the entire chain
   def fast_rounds(pairs, map, n, shortcuts \\ %{})
 
   def fast_rounds([pair | pairs], map, n, shortcuts) do
@@ -89,18 +91,6 @@ defmodule Day14 do
     end
   end
 
-  def rounds(pairs, _map, 0) do
-    pairs
-  end
-
-  def rounds(pairs, map, n) do
-    rounds(round(pairs, map), map, n - 1)
-  end
-
-  def round(pairs, map) do
-    Stream.flat_map(pairs, &(expand(&1, map)))
-  end
-
   def parse(input) do
     lines = input |> String.trim |> String.split("\n", trim: false)
 
@@ -112,19 +102,6 @@ defmodule Day14 do
       parse_pairs(seed),
       parse_mappings(productions)
     }
-  end
-
-  def checksum(polymer) do
-    frequencies = polymer |> Enum.frequencies |> Map.values
-
-    Enum.max(frequencies) - Enum.min(frequencies)
-  end
-
-  def polymer([head | pairs]) do
-    rest = pairs
-    |> Stream.map(&(elem(&1, 1)))
-
-    Enum.concat(Tuple.to_list(head), rest)
   end
 
   def parse_pairs(input) do
