@@ -1,7 +1,5 @@
 defmodule Day17 do
   def solutions(xrange, yrange) do
-    pos_yrange = normalize(yrange)
-
     for x <- 0..xrange.last,
       y <- (yrange.first - 1)..1_000,
       {xstatus, ticks} = simulate_x(x, xrange),
@@ -66,21 +64,6 @@ defmodule Day17 do
       x + xvel > xrange.last && x in xrange -> {:crossthrough, ticks}
       true -> simulate_x(xvel - 1, xrange, x + xvel, ticks + 1)
     end
-  end
-
-  def normalize(range) do
-    {first, last} = {range.first, range.last}
-
-    if (first < 0 && last > 0) || (first > 0 && last < 0) do
-      raise "uh oh, range crosses zero line"
-    end
-
-    first = abs(first)
-    last = abs(last)
-
-    pymin = min(first, last)
-    pymax = max(first, last)
-    pymin..pymax
   end
 
   # In either the X direction or vertical Y direction, we end up with a
